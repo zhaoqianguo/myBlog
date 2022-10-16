@@ -1,0 +1,46 @@
+# Main menu navigation (導航目錄)
+# --------------------------------------
+
+# format: name: link || icon
+# sub-menu
+# name || icon:
+#   name || link || icon
+
+# menu:
+#   Home: / || fas fa-home
+#   Archives: /archives/ || fas fa-archive
+#   Tags: /tags/ || fas fa-tags
+#   Categories: /categories/ || fas fa-folder-open
+#   Docs||fas fa-book:
+#     - 🚀 快速開始 || /posts/21cfbf15/
+#     - 📑 主題頁面 || /posts/dc584b87/
+#     - 🛠 主題配置 || /posts/4aa8abbe/
+#     - ❓ 主題問答 || /posts/98d20436/
+#     - ⚡️ 進階教程 || /posts/4073eda/
+#     - ✨ 更新日誌 || /posts/198a4240/
+#   List||fas fa-list:
+#     - Music || /music/ || fas fa-music
+#     - Gallery || /Gallery/ || fas fa-images
+#     - Movie || /movies/ || fas fa-video
+#   Link: /link/ || fas fa-link
+#   About: /about/ || fas fa-heart
+
+menu:
+  首頁: / || fas fa-home
+  目錄 || fas fa-compass:
+    歸檔: /archives/ || fas fa-archive
+    標籤: /tags/ || fas fa-tags
+    分類: /categories/ || fas fa-folder-open
+  文檔 || fas fa-book:
+    🚀 快速開始: /posts/21cfbf15/
+    📑 主題頁面: /posts/dc584b87/
+    🛠 主題配置-1: /posts/4aa8abbe/
+    ⚔️ 主題配置-2: /posts/ceeb73f/
+    ❓ 主題問答: /posts/98d20436/
+    ⚡️ 進階教程: /posts/4073eda/
+    ✨ 更新日誌: /posts/198a4240/
+  # 娱乐||fa fa-heartbeat:
+    # - 音樂 || /music/ || fas fa-music
+    # 圖庫: /Gallery/ || fas fa-images
+  留言板: /messageboard/ || fas fa-comment-dots
+  友链: /link/ || fas fa-thumbs-up
