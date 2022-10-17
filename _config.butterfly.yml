@@ -40,7 +40,208 @@ menu:
     ⚡️ 進階教程: /posts/4073eda/
     ✨ 更新日誌: /posts/198a4240/
   # 娱乐||fa fa-heartbeat:
-    # - 音樂 || /music/ || fas fa-music
-    # 圖庫: /Gallery/ || fas fa-images
+  # - 音樂 || /music/ || fas fa-music
+  # 圖庫: /Gallery/ || fas fa-images
   留言板: /messageboard/ || fas fa-comment-dots
   友链: /link/ || fas fa-thumbs-up
+
+# Code Blocks (代碼相關)
+# --------------------------------------
+
+highlight_theme: mac # darker / pale night / light / ocean / mac / mac light /false
+highlight_copy: true # copy button
+highlight_lang: true # show the code language
+highlight_shrink: false # true: shrink the code blocks / false: expand the code blocks | none: expand code blocks and hide the button
+highlight_height_limit: 400 # unit: px
+code_word_wrap: false
+
+# copy settings
+# copyright: Add the copyright information after copied content (複製的內容後面加上版權信息)
+copy:
+  enable: true
+  copyright:
+    enable: true
+    limit_count: 150
+
+# social settings (社交圖標設置)
+# --------------------------------------
+# formal:
+#   icon: link || the description
+social:
+  fab fa-github: https://github.com/zhaoqianguo || Github
+  fas fa-envelope: mailto:844851879@qq.com || Email
+  # fas fa-rss: /atom.xml || RSS
+# search (搜索)
+# --------------------------------------
+
+# Algolia search
+# algolia_search:
+#   enable: false
+#   hits:
+#     per_page: 6
+
+# # Local search
+# local_search:
+#   enable: true
+#   preload: false
+#   CDN:
+
+# Image (圖片設置)
+# --------------------------------------
+
+# Favicon（網站圖標）
+favicon: /assets/images/favicon.png
+
+# Avatar (頭像)
+avatar:
+  img: /assets/images/avatar.avif
+  effect: false
+
+# The banner image of home page
+index_img: /assets/images/index_img.jpg
+
+# If the banner of page not setting, it will show the top_img
+default_top_img: https://fastly.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/top_img/index.jpg
+
+# The banner image of archive page
+archive_img: https://fastly.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/top_img/archive.jpg
+
+# If the banner of tag page not setting, it will show the top_img
+# note: tag page, not tags page (子標籤頁面的 top_img)
+tag_img: https://fastly.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/top_img/tag.png
+
+# The banner image of tag page
+# format:
+#  - tag name: xxxxx
+# tag_per_img:
+
+# If the banner of category page not setting, it will show the top_img
+# note: category page, not categories page (子分類頁面的 top_img)
+category_img: https://fastly.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/top_img/category.jpg
+
+# The banner image of category page
+# format:
+#  - category name: xxxxx
+category_per_img:
+
+cover:
+  # display the cover or not (是否顯示文章封面)
+  index_enable: true
+  aside_enable: true
+  archives_enable: true
+  # the position of cover in home page (封面顯示的位置)
+  # left/right/both
+  position: both
+  # When cover is not set, the default cover is displayed (當沒有設置cover時，默認的封面顯示)
+  default_cover: # https://fastly.jsdelivr.net/gh/jerryc127/butterfly_cdn@2.1.0/top_img/default.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-2.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-1.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-3.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-6.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-5.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-4.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-7.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-9.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-8.png
+    - https://fastly.jsdelivr.net/gh/jerryc127/CDN/img/material-10.png
+
+# Replace Broken Images (替換無法顯示的圖片)
+# error_img:
+#   flink: /img/friend_404.gif
+#   post_page: /img/404.jpg
+
+# A simple 404 page
+# error_404:
+#   enable: true
+#   subtitle: "頁面沒有找到"
+#   background:
+
+post_meta:
+  page: # Home Page
+    date_type: created # created or updated or both 主頁文章日期是創建日或者更新日或都顯示
+    date_format: relative # date/relative 顯示日期還是相對日期
+    categories: true # true or false 主頁是否顯示分類
+    tags: false # true or false 主頁是否顯示標籤
+    label: true # true or false 顯示描述性文字
+  post:
+    date_type: created # created or updated or both 文章頁日期是創建日或者更新日或都顯示
+    date_format: relative # date/relative 顯示日期還是相對日期
+    categories: true # true or false 文章頁是否顯示分類
+    tags: true # true or false 文章頁是否顯示標籤
+    label: true # true or false 顯示描述性文字
+
+# wordcount (字數統計)
+# wordcount:
+#   enable: true
+#   post_wordcount: true
+#   min2read: true
+#   total_wordcount: true
+
+# aside (側邊欄)
+# --------------------------------------
+
+aside:
+  enable: true
+  hide: false
+  button: true
+  mobile: true # display on mobile
+  position: right # left or right
+  display:
+    archive: true
+    tag: true
+    category: true
+  card_author:
+    enable: true
+    description:
+    button:
+      enable: true
+      icon: fab fa-github
+      text: follow me
+      link: https://github.com/zhaoqianguo
+  card_announcement: # 公告
+    enable: true
+    content: 永远相信美好的事即将发生😎
+  card_recent_post:
+    enable: true
+    limit: 5 # if set 0 will show all
+    sort: date # date or updated
+    sort_order: # Don't modify the setting unless you know how it works
+  card_categories:
+    enable: true
+    limit: 0 # if set 0 will show all
+    expand: false # none/true/false
+    sort_order: # Don't modify the setting unless you know how it works
+  card_tags:
+    enable: true
+    limit: 40 # if set 0 will show all
+    color: true
+    sort_order: # Don't modify the setting unless you know how it works
+  card_archives:
+    enable: true
+    type: monthly # yearly or monthly
+    format: YYYY年MM月 # eg: YYYY年MM月
+    order: -1 # Sort of order. 1, asc for ascending; -1, desc for descending
+    limit: 8 # if set 0 will show all
+    sort_order: # Don't modify the setting unless you know how it works
+  card_webinfo:
+    enable: true
+    post_count: true
+    last_push_date: true
+    sort_order: # Don't modify the setting unless you know how it works
+
+# Bottom right button (右下角按鈕)
+# --------------------------------------
+
+# Read Mode (閲讀模式)
+readmode: true
+
+# dark mode
+darkmode:
+  enable: true
+  # Toggle Button to switch dark/light mode
+  button: true
+  # Switch dark/light mode automatically (自動切換 dark mode和 light mode)
+  # autoChangeMode: 1  Following System Settings, if the system doesn't support dark mode, it will switch dark mode between 6 pm to 6 am
+  # autoChangeMode: 2  Switch dark mode between 6 pm to 6 am
+  # autoChangeMode: false
+  autoChangeMode: 1
