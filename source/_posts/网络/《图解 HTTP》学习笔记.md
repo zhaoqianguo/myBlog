@@ -36,37 +36,37 @@ categories: "网络"
 </ul>
 <p>分层的好处：把各层之间的接口部分规划好后，修改某个地方时只需修改对应的层，每个层次内部不影响其他层。</p>
 <p><strong>TCP&#x2F;IP 通信传输流</strong></p>
-<p><img src="/../../assets/images/http/image.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image.png" alt="alt text"></p>
 <p>HTTP 举例：</p>
-<p><img src="/../../assets/images/http/image1.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image1.png" alt="alt text"></p>
 <p><strong>与 HTTP 关系密切的协议 : IP、TCP 和 DNS</strong></p>
 <ul>
 <li>负责传输的 IP 协议</li>
 </ul>
-<p><img src="/../../assets/images/http/image2.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image2.png" alt="alt text"></p>
 <ul>
 <li>确保可靠性的 TCP 协议</li>
 </ul>
-<p><img src="/../../assets/images/http/image3.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image3.png" alt="alt text"></p>
 <ul>
 <li>负责域名解析的 DNS 服务</li>
 </ul>
-<p><img src="/../../assets/images/http/image4.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image4.png" alt="alt text"></p>
 <p><strong>各种协议与 HTTP 协议的关系</strong></p>
-<p><img src="/../../assets/images/http/image5.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image5.png" alt="alt text"></p>
 <h2 id="第二章、简单的-HTTP-协议"><a href="#第二章、简单的-HTTP-协议" class="headerlink" title="第二章、简单的 HTTP 协议"></a>第二章、简单的 HTTP 协议</h2><p>HTTP 协议用于客户端和服务器之间的通信，请求资源方成为客户端，提供资源响应方成为服务器端。</p>
 <p>请求报文是由请求方法、请求 URI、协议版本、可选的请求首部字段和内容实体构成的。</p>
 <p>请求报文的构成：</p>
-<p><img src="/../../assets/images/http/image6.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image6.png" alt="alt text"></p>
 <p>响应报文的构成：</p>
-<p><img src="/../../assets/images/http/image7.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image7.png" alt="alt text"></p>
 <p><strong>HTTP 是不保存状态的协议</strong></p>
 <p>HTTP 是一个无状态协议，自身不具备保存之前发送过的请求或响应的功能。</p>
 <p>之后随着发展，引入了 Cookie 技术。</p>
 <p><strong>请求 URI 定位资源</strong></p>
 <p>HTTP 协议使用 URI 定位互联网上的资源。正是因为 URI 的特定功能，在互联网上任意位置的资源都能访问到。</p>
 <p><strong>告知服务器意图的 HTTP 方法</strong></p>
-<p><img src="/../../assets/images/http/image8.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image8.png" alt="alt text"></p>
 <p><strong>持久连接节省通信量</strong></p>
 <p>HTTP 协议的初始版本中，每进行一次 HTTP 通信就要断开一次 TCP 连接。</p>
 <p><strong>持久连接</strong></p>
@@ -83,11 +83,11 @@ categories: "网络"
 <p>用于 HTTP 协议交互的信息被称为 HTTP 报文。</p>
 <p>HTTP 报文本身是由多行（用 CR+LF 作换行符）数据构成的字符串文本。</p>
 <p>HTTP 报文大致可分为报文首部和报文主体两块，通常，并不一定要有报文主体。</p>
-<p><img src="/../../assets/images/http/image9.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image9.png" alt="alt text"></p>
 <p><strong>结构</strong></p>
-<p><img src="/../../assets/images/http/image10.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image10.png" alt="alt text"></p>
 <p><strong>实例</strong></p>
-<p><img src="/../../assets/images/http/image11.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image11.png" alt="alt text"></p>
 <p><strong>编码提升传输速率</strong></p>
 <p>HTTP 在传输时可以原样直接传输，也可以在传输时通过编码提升传输速率，通过编码，能有效地处理大量的访问请求，但也消耗更多的 CPU 等资源。</p>
 <p><strong>报文主体和实体主体的差异</strong></p>
@@ -116,12 +116,12 @@ categories: "网络"
 <p><strong>获取部分内容的范围请求</strong></p>
 <p>为了解决加载超大图片导致网络中断的情况而实现的一种手段，叫做范围请求。</p>
 <p>对一份 10 000 字节大小的资源，如果使用范围请求，可以只请求 5001~10 000 字节内的资源。</p>
-<p><img src="/../../assets/images/http/image12.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image12.png" alt="alt text"></p>
 <p><strong>内容协商返回最合适的内容</strong></p>
 <p>当浏览器的默认语言为英语或中文，访问相同 URI 的 Web 页面时，则会显示对应的英语版或中文版的 Web 页面。这样的机制称为内容协商。</p>
 <h2 id="第四章、返回结果的状态码"><a href="#第四章、返回结果的状态码" class="headerlink" title="第四章、返回结果的状态码"></a>第四章、返回结果的状态码</h2><p>HTTP 状态码负责表示客户端 HTTP 请求的返回结果、标记服务器端的处理是否正常、通知出现的错误等工作。</p>
 <p><strong>状态码类别</strong>：</p>
-<p><img src="/../../assets/images/http/image13.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image13.png" alt="alt text"></p>
 <p>更多：<a target="_blank" rel="noopener" href="https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Status">HTTP 响应代码</a></p>
 <h2 id="第五章、与-HTTP-协作的-Web-服务器"><a href="#第五章、与-HTTP-协作的-Web-服务器" class="headerlink" title="第五章、与 HTTP 协作的 Web 服务器"></a>第五章、与 HTTP 协作的 Web 服务器</h2><p><strong>用单台虚拟主机实现多个域名</strong></p>
 <p>即便物理层面只有一台服务器，但只要使用虚拟主机的功能，则可以搭建多个站点。</p>
@@ -140,22 +140,22 @@ categories: "网络"
 <p><strong>客户端的缓存</strong></p>
 <p>缓存不仅可以存在于缓存服务器内，还可以存在客户端浏览器中。以 Internet Explorer 程序为例，把客户端缓存称为临时网络文件。</p>
 <h2 id="第六章、HTTP-首部"><a href="#第六章、HTTP-首部" class="headerlink" title="第六章、HTTP 首部"></a>第六章、HTTP 首部</h2><p><strong>注：这部分太多解释，建议看原文</strong></p>
-<p><img src="/../../assets/images/http/image14.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image14.png" alt="alt text"></p>
 <p><strong>HTTP 请求报文</strong></p>
 <p>在请求中，HTTP 报文由方法、URI、HTTP 版本、HTTP 首部字段等部分构成</p>
-<p><img src="/../../assets/images/http/image15.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image15.png" alt="alt text"></p>
 <p><strong>HTTP 响应报文</strong></p>
 <p>在响应中，HTTP 报文由 HTTP 版本、状态码（数字和原因短语）、HTTP 首部字段 3 部分构成。</p>
-<p><img src="/../../assets/images/http/image16.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image16.png" alt="alt text"></p>
 <p><strong>HTTP&#x2F;1.1 首部字段一览</strong></p>
 <p>通用首部字段：</p>
-<p><img src="/../../assets/images/http/image17.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image17.png" alt="alt text"></p>
 <p>请求首部字段：</p>
-<p><img src="/../../assets/images/http/image18.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image18.png" alt="alt text"></p>
 <p>响应首部字段：</p>
-<p><img src="/../../assets/images/http/image19.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image19.png" alt="alt text"></p>
 <p>实体首部字段：</p>
-<p><img src="/../../assets/images/http/image20.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image20.png" alt="alt text"></p>
 <h2 id="第七章、HTTP-的缺点"><a href="#第七章、HTTP-的缺点" class="headerlink" title="第七章、HTTP 的缺点"></a>第七章、HTTP 的缺点</h2><p>主要的不足，例举如下：</p>
 <ul>
 <li>通信使用明文（不加密），内容可能会被窃听（例如：抓包）</li>
@@ -169,13 +169,13 @@ categories: "网络"
 <p><strong>HTTPS 是身披 SSL 外壳的 HTTP</strong></p>
 <p>HTTPS 并非是应用层的一种新协议。只是 HTTP 通信接口部分用 SSL 和 TLS 协议代替而已。</p>
 <p>简言之，所谓 HTTPS，其实就是身披 SSL 协议这层外壳的 HTTP。</p>
-<p><img src="/../../assets/images/http/image21.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image21.png" alt="alt text"></p>
 <p>SSL 是独立于 HTTP 的协议，所以不光是 HTTP 协议，其他运行在应用层的 SMTP 和 Telnet 等协议均可配合 SSL 协议使用。可以说 SSL 是当今世界上应用最为广泛的网络安全技术。</p>
 <p><strong>相互交换密钥的公开密钥加密技术</strong></p>
 <p>SSL 采用一种叫做公开密钥加密（非对称加密）的加密处理方式。</p>
 <p><strong>HTTPS 的安全通信机制</strong></p>
 <p>通信步骤：</p>
-<p><img src="/../../assets/images/http/image22.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image22.png" alt="alt text"></p>
 <p><strong>SSL 速度慢吗</strong></p>
 <p>HTTPS 也存在一些问题，那就是当使用 SSL 时，它的处理速度会变慢。</p>
 <p>HTTPS 比 HTTP 要慢 2 到 100 倍，因为与纯文本通信相比，加密通信会消耗更多的 CPU 及内存资源。如果每次通信都加密，会消耗相当多的资源，平摊到一台计算机上时，能够处理的请求数量必定也会随之减少。</p>
@@ -218,7 +218,7 @@ categories: "网络"
 </ul>
 <p><strong>期盼已久的 HTTP&#x2F;2.0</strong></p>
 <p>特点：</p>
-<p><img src="/../../assets/images/http/image23.png" alt="alt text"></p>
+<p><img src="https://zhaoqianguo.github.io/assets/images/http/image23.png" alt="alt text"></p>
 <p><strong>Web 服务器管理文件的 WebDAV</strong></p>
 <p>WebDAV（基于万维网的分布式创作和版本控制）是一个可对 Web 服务器上的内容直接进行文件复制、编辑等操作的分布式文件系统。</p>
 <h2 id="第十章、构建-Web-内容的技术"><a href="#第十章、构建-Web-内容的技术" class="headerlink" title="第十章、构建 Web 内容的技术"></a>第十章、构建 Web 内容的技术</h2><ul>
