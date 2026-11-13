@@ -1,0 +1,12 @@
+# 写稿规范含内部资料与用户原话，myBlog 是 public 仓库，绝不推上去。
+# 本机写稿仍会读这些文件，只是不进 git / 不进云端 checkout。
+VOICE.md
+STYLE_CORPUS.md
+FACT_POOL.md
+
+# 本地运行产物
+logs/
+__pycache__/
+*.pyc
+state/
+HOLD

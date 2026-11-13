@@ -1,0 +1,72 @@
+{
+  "timezone": "Asia/Shanghai",
+  "author": "大西瓜Crown",
+  "paths": {
+    "autopilot": "/Users/zhaolanbaobao/Desktop/code/blog-autopilot",
+    "myBlog": "/Users/zhaolanbaobao/Desktop/code/myBlog",
+    "gh_pages": "/Users/zhaolanbaobao/Desktop/code/zhaoqianguo.github.io",
+    "astro": "/Users/zhaolanbaobao/Desktop/code/astro-blog"
+  },
+  "repos": {
+    "astro": {
+      "owner": "zhaoqianguo",
+      "name": "astro-blog",
+      "branch": "main",
+      "local": "astro"
+    },
+    "gh_pages": {
+      "owner": "zhaoqianguo",
+      "name": "zhaoqianguo.github.io",
+      "branch": "gh-pages",
+      "local": "gh_pages"
+    },
+    "myBlog": {
+      "owner": "zhaoqianguo",
+      "name": "myBlog",
+      "branch": "master",
+      "local": "myBlog",
+      "push_source": true
+    }
+  },
+  "schedule": {
+    "first_run_date": "2026-11-12",
+    "first_window": "AM",
+    "windows": {
+      "AM": "09:00",
+      "PM": "20:00"
+    },
+    "display_time_mode": "publish_moment",
+    "am_ratio": 0.6,
+    "display_jitter_minutes": [0, 45],
+    "missed_days_are_not_backfilled": true
+  },
+  "review": {
+    "mode": "auto",
+    "manual_until": "2026-11-12",
+    "auto_from": "2026-11-13",
+    "note": "人工把关前置到下午写稿环节；晚间云端兜底不再停在 awaiting_approval"
+  },
+  "writing": {
+    "language": "zh-CN",
+    "min_chars": 800,
+    "max_chars": 2600,
+    "allow_images": false,
+    "genres": ["事故复盘", "流水账", "问答", "笔记片段", "对比吐槽", "源码走读"],
+    "topic_mix": {
+      "pitfall": 0.6,
+      "tool": 0.2,
+      "learning": 0.1,
+      "reflection": 0.1
+    },
+    "max_active_series": 1,
+    "series_length": [3, 12],
+    "plan_ahead_weeks": 1
+  },
+  "publish": {
+    "channel_preference": ["git", "api"],
+    "commit_message": "post: {title} ({date})",
+    "hexo_generate": true,
+    "max_api_files_per_commit": 200,
+    "backup_tag": "backup/pre-autopilot-20261111"
+  }
+}
