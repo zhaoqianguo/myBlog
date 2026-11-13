@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check=环境自检 / dry-run=演练 / publish=真实兜底发布'
+        description: 'check=环境自检 / build=只构建不发布 / dry-run=演练 / publish=真实兜底发布'
         required: false
         default: check
 
@@ -65,5 +65,18 @@ jobs:
             check) ;;
             dry-run) python3 scripts/publish/cloud.py publish --dry-run ;;
             publish) python3 scripts/publish/cloud.py publish ;;
+            build)
+              ./node_modules/.bin/hexo generate
+              python3 - <<'PY'
+          from pathlib import Path
+          pub = Path('public')
+          posts = [p for p in pub.rglob('index.html')
+                   if len(p.relative_to(pub).parts) >= 6
+                   and p.relative_to(pub).parts[0].startswith('20')]
+          empty = [str(p.relative_to(pub)) for p in posts if p.stat().st_size == 0]
+          print(f'文章页 {len(posts)} 个，0 字节 {empty}')
+          assert (pub / 'index.html').stat().st_size > 0 and not empty
+          PY
+              ;;
             *) echo "未知 mode: $MODE"; exit 2 ;;
           esac
