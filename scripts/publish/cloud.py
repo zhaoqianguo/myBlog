@@ -98,19 +98,27 @@ def check(cfg: dict) -> tuple[dict, int]:
             out["heads"][label] = f"ERROR: {str(exc)[:160]}"
     myblog = Path(cfg["paths"]["myBlog"])
     ghp = Path(cfg["paths"]["gh_pages"])
+    try:
+        import daily  # noqa: F401  验证发布模块在 CI 里能完整加载
+        modules_ok = True
+    except Exception as exc:
+        modules_ok = False
+        out["module_error"] = f"{type(exc).__name__}: {exc}"
     out["checks"] = {
         "myBlog_root": str(myblog),
         "hexo_bin": (myblog / "node_modules" / ".bin" / "hexo").exists(),
         "package_lock": (myblog / "package-lock.json").exists(),
         "gh_pages_index": (ghp / "index.html").exists(),
+        "publish_modules": modules_ok,
         "drafts": len(list((ROOT / "drafts").glob("*.md"))),
         "plans": len(list((ROOT / "plan").glob("*.md"))),
         "local_date": today().isoformat(),
         "cloud_mode": os.environ.get("AUTOPILOT_CLOUD") == "1",
         "token_from_env": bool(os.environ.get("GH_TOKEN") or os.environ.get("BLOG_PAT")),
     }
+    required = ("hexo_bin", "package_lock", "gh_pages_index", "publish_modules")
     ok = (
-        all(out["checks"][k] for k in ("hexo_bin", "package_lock", "gh_pages_index"))
+        all(out["checks"][k] for k in required)
         and out["checks"]["plans"] > 0
         and not any(str(v).startswith("ERROR") for v in out["heads"].values())
     )
