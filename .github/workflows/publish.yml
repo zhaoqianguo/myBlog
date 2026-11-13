@@ -1,0 +1,69 @@
+name: 博客每日发文（晚间兜底）
+
+on:
+  schedule:
+    # UTC 12:17 = 北京 20:17。GitHub 官方建议避开整点，减少排队被丢弃的概率。
+    - cron: '17 12 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check=环境自检 / dry-run=演练 / publish=真实兜底发布'
+        required: false
+        default: check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blog-daily-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: 取 myBlog（Hexo 源码 + 发布控制面）
+        uses: actions/checkout@v4
+        with:
+          repository: zhaoqianguo/myBlog
+          ref: master
+          path: myBlog
+          token: ${{ secrets.BLOG_PAT }}
+
+      - name: 取 gh-pages（Hexo 产物 diff 基线）
+        uses: actions/checkout@v4
+        with:
+          repository: zhaoqianguo/zhaoqianguo.github.io
+          ref: gh-pages
+          path: gh_pages
+          token: ${{ secrets.BLOG_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: myBlog/package-lock.json
+
+      - name: 安装 Hexo 依赖
+        working-directory: myBlog
+        run: npm ci --no-audit --no-fund
+
+      - name: 环境自检 / 兜底发布
+        working-directory: myBlog
+        env:
+          GH_TOKEN: ${{ secrets.BLOG_PAT }}
+          AUTOPILOT_CLOUD: '1'
+          TZ: Asia/Shanghai
+          BLOG_PATH_MYBLOG: ${{ github.workspace }}/myBlog
+          BLOG_PATH_GH_PAGES: ${{ github.workspace }}/gh_pages
+        run: |
+          MODE="${{ github.event.inputs.mode || 'publish' }}"
+          echo "mode=$MODE"
+          python3 scripts/publish/cloud.py check
+          case "$MODE" in
+            check) ;;
+            dry-run) python3 scripts/publish/cloud.py publish --dry-run ;;
+            publish) python3 scripts/publish/cloud.py publish ;;
+            *) echo "未知 mode: $MODE"; exit 2 ;;
+          esac
