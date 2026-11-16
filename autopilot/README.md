@@ -76,21 +76,21 @@ myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblo
 
 ---
 
-## 为什么每次要重推 40 多个文件
+## 为什么以前每次要重推 40 多个文件
 
-远端 gh-pages 是好几年前的旧主题配置构建的（`標籤` 繁体、还留着已删除的 `messageboard/` 页面），
-本地拿现在的配置一构建，每个页面的标签云顺序、`article:modified_time` 都会变。
-
-选择接受这个成本：多推 48 个小 HTML 换确定性，比只推增量、让新旧页面主题不一致更划算。
+远端 gh-pages 曾经是好几年前的旧主题配置构建的（`標籤` 繁体、还留着已删除的 `messageboard/` 页面），
+本地拿现在的配置一构建，几乎每个页面都会变。2026-11-16 把六处抖动全掐掉之后，
+本地 `public/` 和远端 gh-pages 已经逐文件一致（`compare_output.py` 报 `same=86 diff=0`），
+只剩 7 个历史孤儿页（`categories/网络/HTTP/`、`categories/踩坑/`、`tags/{Astro,Date,Git,Hexo,博客}/`）留在远端。
 
 **别开 `skip_deletions`**。删错一个页面比多留一个孤儿页糟糕得多。
 
 ---
 
-## hexo 构建为什么要装那五个脚本
+## hexo 构建为什么要装那六个脚本
 
 原来的 butterfly 主题+build 完全不幂等：连续两次构建，82 个产物里 45 个不一样。
-六个来源，全在 `scripts/deterministic_*.js` 里掐掉了：
+七个来源，全在 `scripts/deterministic_*.js` 里掐掉了：
 
 | 抖动来源 | 位置 | 处理 |
 | --- | --- | --- |
@@ -100,6 +100,7 @@ myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblo
 | 最后更新时间 `date_xml(Date.now())` | `.../layout/includes/widget/card_webinfo.pug:33` | 同文件重注册 `date_xml` |
 | 标签云配色随机 | `.../scripts/helpers/page.js:40` | `deterministic_tagcloud.js` 按名字哈希 |
 | 上一篇/下一篇同日无序 | `hexo/lib/plugins/generator/post.js:12` | `deterministic_nav.js` 重算 prev/next |
+| 列表页/分页页同日无序 | `hexo-generator-index|archive|category|tag` 各自 `sort('-date')` | `deterministic_posts.js` 在 `before_generate` 里原地排 `locals.posts.data` |
 
 两个坑记住：
 
