@@ -48,15 +48,28 @@ touch autopilot/HOLD
 
 ## 为什么发布不用 git push
 
-本机到 github.com 的 git 协议基本不通：`git fetch` 报
+本机到 github.com 的 git 协议时好时坏：坏的时候 `git fetch` 报
 `RPC failed; curl 28 Failed to connect to github.com port 443 after 75002 ms`，
-`git ls-remote` 三次里两次静默超时。
+`git ls-remote` 三次里两次静默超时；好的时候（2026-11-16 实测）`git fetch` / `git push`
+几十秒内就过。不能赌它通，所以发布链路不依赖 git。
 
-但 `api.github.com` 稳定 200。所以 `github_api.py` 走 Git Data API：
+但 `api.github.com` 一直稳定 200。所以 `github_api.py` 走 Git Data API：
 建 blob → 建 tree → 建 commit → PATCH ref。token 依次取 `GH_TOKEN`、`BLOG_PAT`、
 `~/.git-credentials` 里的 github 那一行。
 
-myBlog 那边只做本地 `git commit`，不 push。等哪天网络好了，`git push` 一把全上去。
+myBlog 那边由 `commit_local_myblog()` 只做本地 `git commit`，不 push（发布不该因为推源码失败而失败）。
+所以**源码要单独补推**：`cd ~/Desktop/code/myBlog && git push origin master`，网络好的时候顺手做一下。
+
+---
+
+## 标签大小写：别写两个只差大小写的 tag
+
+`source/_posts/ES6/` 那 14 篇原本 tags 同时写了 `ES6` 和 `es6`。Hexo 认成两个标签，
+生成 `tags/ES6/` 和 `tags/es6/` 两份页面；而 macOS 文件系统大小写不敏感，本地 `public/`
+只能存在一个目录，于是每次 `git status` 都有两个文件永久 modified，挡后续 pull。
+
+已经修掉（只留 `ES6`），远端那两份 `tags/es6/` 也删了，并重建了一次站点让所有页面的
+`/tags/es6/` 死链变成 `/tags/ES6/`。**以后写 tags 大小写要一致**。
 
 ---
 
