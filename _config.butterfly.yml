@@ -156,6 +156,31 @@ cover:
 #   subtitle: "頁面沒有找到"
 #   background:
 
+# Comment (評論)
+# --------------------------------------
+# giscus 走 GitHub Discussions，不需要后端，国内能直连。
+# 仓库是公开的 myBlog，讨论都落在那里。
+
+comments:
+  use:
+    - Giscus
+  text: true
+  lazyload: false
+  count: false
+  card_post_count: false
+
+giscus:
+  repo: zhaoqianguo/myBlog
+  repo_id: R_kgDOIO10bw
+  category_id: DIC_kwDOIO10b84DLPNJ
+  theme:
+    light: light
+    dark: dark
+  option:
+    data-reactions-enabled: 1
+    data-lang: zh-CN
+    data-input-position: top
+
 post_meta:
   page: # Home Page
     date_type: created # created or updated or both 主頁文章日期是創建日或者更新日或都顯示
