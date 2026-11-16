@@ -32,11 +32,20 @@ def token() -> str:
     raise SystemExit("找不到 GitHub token：设 GH_TOKEN 或写 ~/.git-credentials")
 
 
-def api(method: str, path: str, payload: dict | None = None, tries: int = 5):
+def api(
+    method: str,
+    path: str,
+    payload: dict | None = None,
+    tries: int = 5,
+    retry_4xx: bool = False,
+):
     """带重试的 API 调用。返回解析后的 JSON；204 返回 None。
 
     本机 SSL 偶发 `SSLEOFError: EOF occurred in violation of protocol`，
     这类错误重试就好，不当失败。
+
+    `retry_4xx` 只给建 blob 用：GitHub 偶尔对格式完全正确的 blob 请求回
+    400 malformed request，同一条数据重发就好了（实测 27KB 的 HTML 会这样）。
     """
     body = json.dumps(payload).encode() if payload is not None else None
     last = None
@@ -58,8 +67,8 @@ def api(method: str, path: str, payload: dict | None = None, tries: int = 5):
                 return json.loads(raw) if raw.strip() else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:400]
-            # 4xx 是逻辑错误，重试没意义
-            if 400 <= exc.code < 500:
+            # 4xx 一般是逻辑错误，重试没意义；只有 blob 会偶发假 400
+            if 400 <= exc.code < 500 and not (retry_4xx and exc.code == 400):
                 raise SystemExit(f"{method} {path} -> {exc.code}: {detail}")
             last = f"{exc.code}: {detail}"
         except Exception as exc:
@@ -82,6 +91,8 @@ def create_blob(owner: str, name: str, data: bytes) -> str:
         "POST",
         f"{repo_path(owner, name)}/git/blobs",
         {"content": base64.b64encode(data).decode(), "encoding": "base64"},
+        tries=6,
+        retry_4xx=True,
     )
     return res["sha"]
 
