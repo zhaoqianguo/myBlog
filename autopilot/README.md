@@ -16,7 +16,7 @@
   ↓ 与远端 gh-pages 逐文件比 blob sha，只推变化的
   ├→ gh-pages  走 GitHub Data API 批量提交   → https://zhaoqianguo.github.io/
   └→ astro main 走 GitHub Data API 提交      → Vercel 自动构建 → https://daxigua-crown.vercel.app/
-  ↓ 本地 git commit（只提交，不 push）
+  ↓ 源文本地 commit 后 push origin master（push 不通才降级 API，两条都不通打 ERROR）
   ↓ 写 ledger.json，回写 plan/{周}.md 的状态列
 ```
 
@@ -57,8 +57,11 @@ touch autopilot/HOLD
 建 blob → 建 tree → 建 commit → PATCH ref。token 依次取 `GH_TOKEN`、`BLOG_PAT`、
 `~/.git-credentials` 里的 github 那一行。
 
-myBlog 那边由 `commit_local_myblog()` 只做本地 `git commit`，不 push（发布不该因为推源码失败而失败）。
-所以**源码要单独补推**：`cd ~/Desktop/code/myBlog && git push origin master`，网络好的时候顺手做一下。
+myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblog()` 推远端：
+先试 3 次 `git push`（各 120s 超时），全失败才降级 Git Data API 只推源码文件；
+降级后如果能 fetch 就把本地 `reset --hard` 对齐远端，避免下次 push 撞 non-fast-forward。
+两条都不通时打 ERROR、ledger 里记 `myBlog_source_channel: "failed"`，站点本身照样发布成功。
+查发布是不是真的三边都上去了：看 ledger 那条的 `myBlog_source_channel` 是不是 `git`。
 
 ---
 

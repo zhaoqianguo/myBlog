@@ -113,33 +113,86 @@ def _blob_sha(data: bytes) -> str:
     return h.hexdigest()
 
 
-def commit_local_myblog(cfg: dict, paths: list[str], message: str) -> str | None:
-    """在 myBlog 本地仓库提交源码。
-
-    只提交，不 push：本机到 github.com 的 git 协议基本不通，push 必超时。
-    本地留个提交，等于源码有另一份历史；以后网络好了 `git push` 一把就能推上去。
-    推送失败不影响发布，所以这里全部吞掉异常。
-    """
+def commit_local(cfg: dict, paths: list[str], message: str) -> str | None:
+    """在 myBlog 本地仓库把源码提交上去（push 由 push_source_to_myblog 负责）。"""
     root = Path(cfg["paths"]["myBlog"])
+    # 草稿也一起提交：以后想回头改文风、看实验记录，得从仓库里找得到
+    extra = ["autopilot/drafts", "autopilot/plan", "autopilot/ledger.json"]
     try:
-        subprocess.run(["git", "add", "--", *paths], cwd=root, check=True,
-                       capture_output=True, timeout=60)
-        res = subprocess.run(
-            ["git", "commit", "-m", message], cwd=root,
-            capture_output=True, text=True, timeout=60,
-        )
+        _git(root, "add", "--", *paths, *[p for p in extra if (root / p).exists()], timeout=90)
+        res = _git(root, "commit", "-m", message, timeout=60)
         if res.returncode != 0:
             log(f"myBlog 本地提交跳过：{res.stdout.strip() or res.stderr.strip()}")
             return None
-        sha = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=root,
-            capture_output=True, text=True, timeout=30,
-        ).stdout.strip()
+        sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
         log(f"myBlog 本地提交 -> {sha[:8]}")
         return sha
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log(f"myBlog 本地提交失败（不影响发布）：{exc}", "WARN")
         return None
+
+
+def _git(root: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args], cwd=root, capture_output=True, text=True, timeout=timeout
+    )
+
+
+def push_source_to_myblog(cfg: dict, message: str) -> tuple[str | None, str]:
+    """把 myBlog 的本地提交推到远端，返回 (sha, 通道)。
+
+    先试 git push：网络好的时候几十秒就过，且本地/远端历史一致，最干净。
+    push 全失败才降级走 Git Data API，只把这次渲染出的源码文件送上去 —— 这样
+    「发布成功但源码没上去」不会再发生。降级意味着远端多一个 API 提交、本地多
+    一个还没推的提交，历史会分叉，所以打 WARN 提醒下次网络好时手动收拢。
+    两条都不通就返回 (None, "failed")，不影响站点已经发布这件事。
+    """
+    root = Path(cfg["paths"]["myBlog"])
+    branch = cfg["repos"]["myBlog"]["branch"]
+
+    for attempt in (1, 2, 3):
+        try:
+            res = _git(root, "push", "origin", branch, timeout=120)
+            if res.returncode == 0:
+                sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
+                log(f"myBlog 源码已 push -> {sha[:8]}")
+                return sha, "git"
+            log(f"myBlog push 第 {attempt} 次失败：{(res.stderr or res.stdout).strip()[:200]}", "WARN")
+        except subprocess.TimeoutExpired:
+            log(f"myBlog push 第 {attempt} 次超时（120s）", "WARN")
+        except Exception as exc:  # noqa: BLE001
+            log(f"myBlog push 第 {attempt} 次异常：{exc}", "WARN")
+
+    # 降级：远端工作区是干净的，用 Git Data API 把源码文件直接写上去
+    try:
+        dirty = _git(root, "status", "--porcelain", "--untracked-files=no", timeout=30).stdout.strip()
+        if dirty:
+            log("myBlog 工作区不干净，跳过 API 降级（怕把半个提交推上去）", "WARN")
+            return None, "failed"
+        diff = _git(root, "diff", "--name-only", "origin/" + branch, "HEAD", timeout=60).stdout.split()
+        if not diff:
+            sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
+            log("myBlog 远端已经是这个提交了", "WARN")
+            return sha, "already"
+        files = {p: (root / p).read_bytes() for p in diff if (root / p).exists()}
+        repo = cfg["repos"]["myBlog"]
+        res = gh.commit_files(repo["owner"], repo["name"], branch, files, message)
+        log(
+            f"myBlog 源码走 API 上去 -> {res['commit'][:8]}（{len(res['changed'])} 个文件）"
+        )
+        # API 提交和本地提交内容一致、只是历史不同。能 fetch 就把本地对齐过去，
+        # 否则下次 push 会 non-fast-forward 直接失败。
+        try:
+            if _git(root, "fetch", "origin", branch, timeout=120).returncode == 0:
+                _git(root, "reset", "--hard", f"origin/{branch}", timeout=60)
+                log(f"myBlog 本地已对齐到远端 {res['commit'][:8]}")
+                return res["commit"], "api"
+        except Exception as exc:  # noqa: BLE001
+            log(f"对齐本地失败（下次手跑 git fetch && git reset --hard origin/{branch}）：{exc}", "WARN")
+        return res["commit"], "api"
+    except Exception as exc:  # noqa: BLE001
+        log(f"myBlog 源码两条通道都没上去：{exc}", "ERROR")
+        return None, "failed"
 
 
 def hold_file() -> Path:
@@ -204,9 +257,10 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
     )
     log(f"astro -> {res_astro['commit'][:8]}")
 
-    # 6. 源码在 myBlog 本地落地成一次提交（不 push，见函数注释）
+    # 6. 源码提交到 myBlog 并推到远端（push 不通才降级 API）
     hexo_rel = f"source/_posts/{info['stem']}.md"
-    src_sha = commit_local_myblog(cfg, [hexo_rel], msg)
+    src_sha = commit_local(cfg, [hexo_rel], msg)
+    src_sha, src_channel = push_source_to_myblog(cfg, msg)
 
     # 7. 记账
     ledger = load_ledger()
@@ -220,6 +274,7 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
         "gh_pages_files": len(res_gh["changed"]),
         "astro_sha": res_astro["commit"],
         "myBlog_source_sha": src_sha,
+        "myBlog_source_channel": src_channel,
         "lint": {"chars": lint["stats"]["chars"], "warnings": lint["warnings"]},
     }
     ledger.setdefault("entries", [])
