@@ -20,8 +20,9 @@
   ↓ 写 ledger.json，回写 plan/{周}.md 的状态列
 ```
 
-耗时实测：hexo 构建 4 秒，推 gh-pages 约 3 分钟（48 个 blob 一个个建），astro 20 秒。
-**一次完整发布 3~4 分钟**，别在中途 Ctrl-C。
+耗时实测：hexo 构建 4 秒，astro 20 秒。推 gh-pages 的时间看变了多少文件——构建已经幂等，
+日常一篇新文章只变动十几二十个页面，几十秒就完；第一次全量对齐时推了 48 个 blob，约 3 分钟。
+**一次完整发布 2~5 分钟**，别在中途 Ctrl-C。
 
 ---
 
@@ -164,5 +165,8 @@ commit 没建成功就不会动 ref，远端还是上一次的样子。重跑一
 
 ## 已知没收拾的
 
-- `_config.butterfly.yml:45` 还挂着 `留言板: /messageboard/`，页面早删了，是个死链。
-- 远端 gh-pages 有 10 个孤儿文件（`messageboard/`、`categories/踩坑/` 等），没删。
+- `source/_posts/2026-11-13-Fiber把一次渲染拆成了什么.md` 的 `date` 是 `2026-11-16 09:27:00`，
+  不是文件名上的 11-13（历史上被改过三次 date）。所以它和 11-16 那篇同一天，归档落在 `2026/11/16/` 下面。
+- `astro-blog/src/config.ts:4` 的 `SITE.website` 写的是 `https://daxigua-crown.com`，那个域名没注册
+  （Verisign whois 查无记录），线上实际跑在 `daxigua-crown.vercel.app`。本机访问不了后者
+  （SNI 里出现 `.vercel.app` 就被 RST），要能从本机打开得绑一个自定义域名。
