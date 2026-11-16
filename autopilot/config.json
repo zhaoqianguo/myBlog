@@ -1,0 +1,51 @@
+{
+  "paths": {
+    "myBlog": "/Users/zhaolanbaobao/Desktop/code/myBlog",
+    "gh_pages": "/Users/zhaolanbaobao/Desktop/code/zhaoqianguo.github.io",
+    "astro": "/Users/zhaolanbaobao/Desktop/code/astro-blog"
+  },
+  "repos": {
+    "gh_pages": {
+      "owner": "zhaoqianguo",
+      "name": "zhaoqianguo.github.io",
+      "branch": "gh-pages"
+    },
+    "astro": {
+      "owner": "zhaoqianguo",
+      "name": "astro-blog",
+      "branch": "main"
+    },
+    "myBlog": {
+      "owner": "zhaoqianguo",
+      "name": "myBlog",
+      "branch": "master",
+      "push_source": false
+    }
+  },
+  "timezone": "Asia/Shanghai",
+  "schedule": {
+    "window": "PM",
+    "run_at": "20:00",
+    "display_jitter_minutes": [
+      0,
+      45
+    ],
+    "missed_days_are_not_backfilled": true
+  },
+  "writing": {
+    "language": "zh-CN",
+    "min_chars": 1500,
+    "max_chars": 6500,
+    "max_active_series": 1,
+    "series_length": [
+      3,
+      12
+    ],
+    "plan_ahead_weeks": 1
+  },
+  "publish": {
+    "commit_message": "post: {title} ({date})",
+    "hexo_generate": true,
+    "skip_deletions": true
+  }
+}
