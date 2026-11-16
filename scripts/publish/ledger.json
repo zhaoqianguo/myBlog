@@ -17,6 +17,22 @@
       "gh_pages_channel": "api",
       "myBlog_source_sha": "5ca57200e94c82498b4841c80fee91fbaf05bb3e",
       "myBlog_source_channel": "api"
+    },
+    {
+      "date": "2026-11-13",
+      "slug": "Fiber把一次渲染拆成了什么",
+      "title": "Fiber 把一次渲染拆成了什么",
+      "genre": "源码走读",
+      "series": "实现原理 #2",
+      "window": "PM",
+      "pub_datetime": "2026-11-16 09:29:00",
+      "status": "partial",
+      "astro_sha": "33bb031ceeed67021208ef26c3687ddfef1c3fab",
+      "gh_pages_sha": "07e156837e40518d696fda5dea2fa196f492bd37",
+      "astro_channel": "api",
+      "gh_pages_channel": "already",
+      "myBlog_source_sha": null,
+      "myBlog_source_channel": "failed"
     }
   ],
   "series": {
