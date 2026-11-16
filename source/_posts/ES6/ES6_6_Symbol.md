@@ -3,7 +3,6 @@ title: "ES6 学习笔记（6） - Symbol"
 date: 2022-06-03 20:02:07
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 

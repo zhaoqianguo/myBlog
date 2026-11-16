@@ -3,7 +3,6 @@ title: "ES6 学习笔记（12） - Generator 函数"
 date: 2022-06-09 20:35:07
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 

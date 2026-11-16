@@ -3,7 +3,6 @@ title: "ES6 学习笔记（10） - Promise"
 date: 2022-06-06 23:01:06
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 

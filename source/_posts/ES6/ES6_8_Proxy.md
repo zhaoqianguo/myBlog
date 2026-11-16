@@ -3,7 +3,6 @@ title: "ES6 学习笔记（8） - Proxy"
 date: 2022-06-04 19:59:05
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 

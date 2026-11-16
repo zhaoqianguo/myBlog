@@ -3,7 +3,6 @@ title: "ES6 学习笔记（11） - Iterator & for … of"
 date: 2022-06-08 21:05:36
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 

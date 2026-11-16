@@ -4,7 +4,6 @@ date: 2022-05-28 22:31:46
 updated:
 tags:
   - ES6
-  - es6
 categories: ES6
 keywords: "解构赋值,解构"
 description:

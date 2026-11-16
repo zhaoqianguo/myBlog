@@ -3,7 +3,6 @@ title: "ES6 学习笔记（1） - Reflect"
 date: 2022-06-05 20:57:09
 tags:
   - "ES6"
-  - "es6"
 categories: "ES6"
 ---
 
