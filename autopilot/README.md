@@ -82,7 +82,7 @@ myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblo
 远端 gh-pages 曾经是好几年前的旧主题配置构建的（`標籤` 繁体、还留着已删除的 `messageboard/` 页面），
 本地拿现在的配置一构建，几乎每个页面都会变。2026-11-16 把六处抖动全掐掉之后，
 本地 `public/` 和远端 gh-pages 已经逐文件一致（`compare_output.py` 报 `same=86 diff=0`），
-只剩 7 个历史孤儿页（`categories/网络/HTTP/`、`categories/踩坑/`、`tags/{Astro,Date,Git,Hexo,博客}/`）留在远端。
+孤儿页已清干净（`compare_output.py` 报 `remote_only=0`）。
 
 **别开 `skip_deletions`**。删错一个页面比多留一个孤儿页糟糕得多。
 
@@ -101,13 +101,16 @@ myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblo
 | 最后更新时间 `date_xml(Date.now())` | `.../layout/includes/widget/card_webinfo.pug:33` | 同文件重注册 `date_xml` |
 | 标签云配色随机 | `.../scripts/helpers/page.js:40` | `deterministic_tagcloud.js` 按名字哈希 |
 | 上一篇/下一篇同日无序 | `hexo/lib/plugins/generator/post.js:12` | `deterministic_nav.js` 重算 prev/next |
-| 列表页/分页页同日无序 | `hexo-generator-index|archive|category|tag` 各自 `sort('-date')` | `deterministic_posts.js` 在 `before_generate` 里原地排 `locals.posts.data` |
+| 列表页/分页页同日无序 | `hexo-generator-index\|archive\|category\|tag` 各自 `sort('-date')` | `deterministic_posts.js` 包住 `locals.posts` 的 getter，取一次排一次 |
 
-两个坑记住：
+三个坑记住：
 
 1. **主题的 `scripts/` 在根目录 `scripts/` 之后加载**，直接 `register` 会被主题那份盖掉，
    必须包在 `hexo.on('generateBefore', ...)` 里。
 2. **`cover:` 留空时 Hexo 解析成 `null` 不是 `undefined`**，判空要写 `if (data.cover === false || data.cover)`。
+3. **`before_generate` 里拿到的 `locals.posts` 是缓存里的旧查询**（实测只有 2 条，每次还不一样），
+   generator 在 `_runGenerators()` 开头会 `locals.invalidate()` 重新查库，排的根本不是同一份数据。
+   要排就得包 getter：`const original = hexo.locals.getters.posts; hexo.locals.set('posts', () => sort(original()))`。
 
 改完验证：
 
@@ -156,7 +159,16 @@ commit 没建成功就不会动 ref，远端还是上一次的样子。重跑一
 
 **astro 推了但 Vercel 没部署**：查
 `/repos/zhaoqianguo/astro-blog/commits/{sha}/status`，`Vercel` context 是不是 success。
-本机访问不到 `vercel.app`（DNS 被劫持、直连 IP 被 reset），只能用 API 看。
+
+**本机 curl 打不开 vercel.app**：命令行走的是系统代理（系统设置里 `127.0.0.1:7897`），
+但 shell 不继承它，所以要显式带上：
+
+```bash
+export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897
+curl -s -o /dev/null -w '%{http_code}\n' https://daxigua-crown.vercel.app/
+```
+
+不带代理时 DNS 会返回劫持地址、直连 76.76.21.21 的 TLS 握手被 RST，看着像站点挂了，其实是本地没走代理。
 
 **想推 astro 的 node_modules 就重装**：`COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile`，
 不然 `astro check` 会报 `Buffer<ArrayBufferLike>` 那个 `ts(2345)`。
@@ -165,8 +177,6 @@ commit 没建成功就不会动 ref，远端还是上一次的样子。重跑一
 
 ## 已知没收拾的
 
-- `source/_posts/2026-11-13-Fiber把一次渲染拆成了什么.md` 的 `date` 是 `2026-11-16 09:27:00`，
-  不是文件名上的 11-13（历史上被改过三次 date）。所以它和 11-16 那篇同一天，归档落在 `2026/11/16/` 下面。
-- `astro-blog/src/config.ts:4` 的 `SITE.website` 写的是 `https://daxigua-crown.com`，那个域名没注册
-  （Verisign whois 查无记录），线上实际跑在 `daxigua-crown.vercel.app`。本机访问不了后者
-  （SNI 里出现 `.vercel.app` 就被 RST），要能从本机打开得绑一个自定义域名。
+- `daxigua-crown.com` 没注册（Verisign whois 查无记录）。`SITE.website` 已改成
+  `https://daxigua-crown.vercel.app`，等域名买了再换回去。
+- 想从本机直接打开 Vercel 站点得走系统代理，见上面「坏了怎么办」那段。

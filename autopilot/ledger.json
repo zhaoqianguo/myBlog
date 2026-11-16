@@ -1,6 +1,23 @@
 {
   "entries": [
     {
+      "date": "2026-11-13",
+      "slug": "Fiber把一次渲染拆成了什么",
+      "title": "Fiber 把一次渲染拆成了什么",
+      "pub_datetime": "2026-11-13T15:30:00+08:00",
+      "status": "published",
+      "gh_pages_sha": "2a367979",
+      "gh_pages_files": 49,
+      "astro_sha": "92a474bb",
+      "myBlog_source_sha": "4d3ad9a",
+      "myBlog_source_channel": "git",
+      "lint": {
+        "chars": 6116,
+        "warnings": []
+      },
+      "note": "补记：这篇原本 date 被误设成 2026-11-16，2026-11-16 改回 11-13 并重推两端"
+    },
+    {
       "date": "2026-11-16",
       "slug": "微任务队列在哪一步清空",
       "title": "微任务队列在哪一步清空",
