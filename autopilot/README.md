@@ -12,17 +12,23 @@
   ↓ render.py              （同一份正文，渲两套 frontmatter）
   ├→ myBlog/source/_posts/2026-11-17-xxx.md
   └→ astro-blog/src/content/blog/2026-11-17-xxx.md
-  ↓ hexo clean && generate （myBlog/public/）
-  ↓ 与远端 gh-pages 逐文件比 blob sha，只推变化的
-  ├→ gh-pages  走 GitHub Data API 批量提交   → https://zhaoqianguo.github.io/
-  └→ astro main 走 GitHub Data API 提交      → Vercel 自动构建 → https://daxigua-crown.vercel.app/
-  ↓ 源文本地 commit 后 push origin master（push 不通才降级 API，两条都不通打 ERROR）
+  ↓ hexo clean && generate （本地构建只为自检：0 字节页、文章页没生成，当场拦下）
+  ↓ 源码进 myBlog，推 origin master
+  │    → GitHub Actions 跑 .github/workflows/deploy.yml
+  │    → npm ci → hexo generate → 推 zhaoqianguo/zhaoqianguo.github.io 的 gh-pages
+  │    → https://zhaoqianguo.github.io/
+  ├→ astro 正文推到 astro-blog main
+  │    → Vercel 自动构建
+  │    → https://daxigua-crown.vercel.app/
   ↓ 写 ledger.json，回写 plan/{周}.md 的状态列
 ```
 
-耗时实测：hexo 构建 4 秒，astro 20 秒。推 gh-pages 的时间看变了多少文件——构建已经幂等，
-日常一篇新文章只变动十几二十个页面，几十秒就完；第一次全量对齐时推了 48 个 blob，约 3 分钟。
-**一次完整发布 2~5 分钟**，别在中途 Ctrl-C。
+**部署全在线上，本地不产出 gh-pages 了。** 本地只做两件事：过闸门 + 把提交送出去。
+好处是本机网络再抽风，只要提交能上去，构建和部署都不受影响；坏处是本地 `public/`
+和线上不再是同一份构建（Node 版本、时区可能有细微差别），所以 `public/` 现在只是自检产物。
+
+耗时：hexo 本地自检 4 秒，push 几秒到几十秒，Actions 构建约 40 秒，Vercel 约 30 秒。
+**本机上的操作 1 分钟内结束**，线上构建自己跑，不用等。
 
 ---
 
@@ -52,17 +58,16 @@ touch autopilot/HOLD
 本机到 github.com 的 git 协议时好时坏：坏的时候 `git fetch` 报
 `RPC failed; curl 28 Failed to connect to github.com port 443 after 75002 ms`，
 `git ls-remote` 三次里两次静默超时；好的时候（2026-11-16 实测）`git fetch` / `git push`
-几十秒内就过。不能赌它通，所以发布链路不依赖 git。
+几十秒内就过。不能赌它通，所以两条路都留着。
 
-但 `api.github.com` 一直稳定 200。所以 `github_api.py` 走 Git Data API：
-建 blob → 建 tree → 建 commit → PATCH ref。token 依次取 `GH_TOKEN`、`BLOG_PAT`、
-`~/.git-credentials` 里的 github 那一行。
+`push_with_fallback()` 先试 3 次 `git push`（各 120s 超时），全失败才降级 Git Data API
+（建 blob → 建 tree → 建 commit → PATCH ref，token 依次取 `GH_TOKEN`、`BLOG_PAT`、
+`~/.git-credentials`）。降级后如果能 fetch 就把本地 `reset --hard` 对齐远端，避免下次
+push 撞 non-fast-forward。两条都不通时打 ERROR、ledger 里记 `"failed"`，
+重跑 `publish.py --force` 补上就行 —— 线上状态由 Actions 那边决定，不会因为本地失败而错乱。
 
-myBlog 那边由 `commit_local()` 在本地提交，再由 `push_source_to_myblog()` 推远端：
-先试 3 次 `git push`（各 120s 超时），全失败才降级 Git Data API 只推源码文件；
-降级后如果能 fetch 就把本地 `reset --hard` 对齐远端，避免下次 push 撞 non-fast-forward。
-两条都不通时打 ERROR、ledger 里记 `myBlog_source_channel: "failed"`，站点本身照样发布成功。
-查发布是不是真的三边都上去了：看 ledger 那条的 `myBlog_source_channel` 是不是 `git`。
+查发布有没有真的上去：`gh_pages` 看 Actions 的 run 是不是 success，
+astro 看 commit status 里的 `Vercel` context。
 
 ---
 
@@ -142,7 +147,8 @@ AstroPaper 的 `scheduledPostMargin: 15min` 会把它当定时稿藏起来，而
 
 ## 状态在哪
 
-- `ledger.json` —— 发过什么，每条带两个 sha 和文件数。**排重就看这个**。
+- `ledger.json` —— 发过什么，每条带 myBlog / astro 的 sha 和通道。**排重就看这个**。
+  `status` 现在是 `pushed`（推上去了，部署由线上负责）。
 - `plan/2026-W47.md` —— 本周七天的计划，最后那列状态会被回写。
 - `logs/daily.log` —— 每次跑的流水。
 
@@ -154,8 +160,13 @@ AstroPaper 的 `scheduledPostMargin: 15min` 会把它当定时稿藏起来，而
 
 **hexo 构建失败**：先 `npm ci`。构建完会检查 0 字节的 `index.html`，有就报错不出稿。
 
-**gh-pages 推了一半**：Git Data API 是原子的（tree+commit+ref 分开 PATCH），
-commit 没建成功就不会动 ref，远端还是上一次的样子。重跑一遍即可，是幂等的。
+**Actions 构建失败**：看 https://github.com/zhaoqianguo/myBlog/actions 那次 run 的日志。
+最常见是 `npm ci` 失败（`package-lock.json` 与 `package.json` 不同步）或者本地能过、
+CI 过不了的时区/大小写问题（Linux 大小写敏感，`tags/ES6` 与 `tags/es6` 这类问题在本地
+macOS 上看不出来，CI 上会直接暴露成两个目录）。
+
+**Actions 成功了但 Pages 没更新**：gh-pages 分支推成功不等于 Pages 重建，等 30 秒再看；
+还不行就看 `zhaoqianguo.github.io` 仓库的 Pages 设置是不是还指着 `gh-pages` 分支根目录。
 
 **astro 推了但 Vercel 没部署**：查
 `/repos/zhaoqianguo/astro-blog/commits/{sha}/status`，`Vercel` context 是不是 success。

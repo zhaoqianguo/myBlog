@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""发布一篇：草稿 → 文风闸门 → 渲染两端 → hexo 构建 → 推 gh-pages → 推 astro。
+"""发布一篇：草稿 → 文风闸门 → 渲染两端 → 推 myBlog(master) 与 astro(main)，部署交给线上。
 
-    python3 publish.py --date 2026-11-16            # 正常发布
-    python3 publish.py --date 2026-11-16 --dry-run  # 只跑闸门和构建，不推
+    python3 publish.py --date 2026-11-17            # 正常发布
+    python3 publish.py --date 2026-11-17 --dry-run  # 只跑闸门 + 本地构建自检，不推
     python3 publish.py --check                      # 只看今天该不该发、发了没
 
-设计上刻意不做两件事：
-- 不做 git push（本机到 github.com 的 git 协议基本不通），全走 HTTPS API。
-- 不删远端文件（skip_deletions），只增改。删错一个页面比多一个孤儿页糟糕得多。
+两条部署路径都不在本地做：
+- myBlog master push 后由 .github/workflows/deploy.yml 构建并推 zhaoqianguo.github.io 的 gh-pages；
+- astro-blog main push 后由 Vercel 自动构建部署。
+
+本地只做两件事：把源码提交推上去、用 hexo 本地构建一次做自检（0 字节页面直接拦下）。
+这样做的好处是发布不再依赖本机网络稳定 —— 本机只要能把提交送出去就行。
 """
 from __future__ import annotations
 
@@ -28,9 +31,7 @@ from common import (
     log,
     load_config,
     load_ledger,
-    parse_draft,
     parse_plan,
-    pub_datetime,
     save_ledger,
     today,
     update_plan_status,
@@ -47,12 +48,19 @@ def find_draft(d: Date) -> Path | None:
     p = draft_path(d)
     if p.exists():
         return p
-    # 也接受带标题后缀的草稿：2026-11-16-微任务队列在哪一步清空.md
+    # 也接受带标题后缀的草稿：2026-11-17-微任务队列在哪一步清空.md
     hits = sorted((ROOT / "drafts").glob(f"{d.isoformat()}-*.md"))
     return hits[0] if hits else None
 
 
+def _git(root: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args], cwd=root, capture_output=True, text=True, timeout=timeout
+    )
+
+
 def run_hexo(cfg: dict) -> Path:
+    """本地构建一次，纯粹为了自检。产物不推，推的是 GitHub Actions 构建的那份。"""
     root = Path(cfg["paths"]["myBlog"])
     hexo = root / "node_modules" / ".bin" / "hexo"
     if not hexo.exists():
@@ -75,46 +83,56 @@ def run_hexo(cfg: dict) -> Path:
     ]
     if empty:
         raise SystemExit(f"构建出 0 字节页面：{empty[:5]}")
+
+    # 新文章该生成的页面必须存在，否则说明 frontmatter 又出问题了
     return public
 
 
-def collect_changes(public: Path, cfg: dict) -> tuple[dict[str, bytes], list[str]]:
-    """对比本地 public/ 与远端 gh-pages，返回要推的文件和要删的文件。"""
-    repo = cfg["repos"]["gh_pages"]
-    tree = gh.api(
-        "GET",
-        f"{gh.repo_path(repo['owner'], repo['name'])}/git/trees/{repo['branch']}?recursive=1",
-    )
-    remote = {x["path"]: x["sha"] for x in tree["tree"] if x["type"] == "blob"}
+def push_with_fallback(root: Path, repo: dict, files_hint: list[str], message: str) -> tuple[str | None, str]:
+    """先 git push，不通降级 Git Data API。返回 (sha, 通道)。"""
+    branch = repo["branch"]
+    for attempt in (1, 2, 3):
+        try:
+            res = _git(root, "push", "origin", branch, timeout=120)
+            if res.returncode == 0:
+                sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
+                log(f"{repo['name']} 已 push -> {sha[:8]}")
+                return sha, "git"
+            log(f"{repo['name']} push 第 {attempt} 次失败：{(res.stderr or res.stdout).strip()[:200]}", "WARN")
+        except subprocess.TimeoutExpired:
+            log(f"{repo['name']} push 第 {attempt} 次超时（120s）", "WARN")
+        except Exception as exc:  # noqa: BLE001
+            log(f"{repo['name']} push 第 {attempt} 次异常：{exc}", "WARN")
 
-    upload: dict[str, bytes] = {}
-    for f in sorted(public.rglob("*")):
-        if not f.is_file():
-            continue
-        rel = str(f.relative_to(public))
-        data = f.read_bytes()
-        if remote.get(rel) != _blob_sha(data):
-            upload[rel] = data
-
-    deletions: list[str] = []
-    if not cfg["publish"].get("skip_deletions", True):
-        deletions = sorted(p for p in remote if p not in {
-            str(f.relative_to(public)) for f in public.rglob("*") if f.is_file()
-        })
-    return upload, deletions
-
-
-def _blob_sha(data: bytes) -> str:
-    import hashlib
-
-    h = hashlib.sha1()
-    h.update(b"blob %d\0" % len(data))
-    h.update(data)
-    return h.hexdigest()
+    # 降级：远端工作区是干净的，用 Git Data API 把这次的文件直接写上去
+    try:
+        dirty = _git(root, "status", "--porcelain", "--untracked-files=no", timeout=30).stdout.strip()
+        if dirty:
+            log(f"{repo['name']} 工作区不干净，跳过 API 降级（怕把半个提交推上去）", "WARN")
+            return None, "failed"
+        diff = _git(root, "diff", "--name-only", "origin/" + branch, "HEAD", timeout=60).stdout.split()
+        diff = diff or files_hint
+        if not diff:
+            sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
+            log(f"{repo['name']} 远端已经是这个提交了", "WARN")
+            return sha, "already"
+        files = {p: (root / p).read_bytes() for p in diff if (root / p).exists()}
+        res = gh.commit_files(repo["owner"], repo["name"], branch, files, message)
+        log(f"{repo['name']} 走 API 上去 -> {res['commit'][:8]}（{len(res['changed'])} 个文件）")
+        # API 提交与本地提交内容一致、历史不同。能 fetch 就对齐，否则下次 push 会 non-fast-forward
+        try:
+            if _git(root, "fetch", "origin", branch, timeout=120).returncode == 0:
+                _git(root, "reset", "--hard", f"origin/{branch}", timeout=60)
+                log(f"{repo['name']} 本地已对齐到远端 {res['commit'][:8]}")
+        except Exception as exc:  # noqa: BLE001
+            log(f"{repo['name']} 对齐本地失败（下次手跑 git fetch && git reset --hard）：{exc}", "WARN")
+        return res["commit"], "api"
+    except Exception as exc:  # noqa: BLE001
+        log(f"{repo['name']} 两条通道都没上去：{exc}", "ERROR")
+        return None, "failed"
 
 
 def commit_local(cfg: dict, paths: list[str], message: str) -> str | None:
-    """在 myBlog 本地仓库把源码提交上去（push 由 push_source_to_myblog 负责）。"""
     root = Path(cfg["paths"]["myBlog"])
     # 草稿也一起提交：以后想回头改文风、看实验记录，得从仓库里找得到
     extra = ["autopilot/drafts", "autopilot/plan", "autopilot/ledger.json"]
@@ -130,69 +148,6 @@ def commit_local(cfg: dict, paths: list[str], message: str) -> str | None:
     except Exception as exc:  # noqa: BLE001
         log(f"myBlog 本地提交失败（不影响发布）：{exc}", "WARN")
         return None
-
-
-def _git(root: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args], cwd=root, capture_output=True, text=True, timeout=timeout
-    )
-
-
-def push_source_to_myblog(cfg: dict, message: str) -> tuple[str | None, str]:
-    """把 myBlog 的本地提交推到远端，返回 (sha, 通道)。
-
-    先试 git push：网络好的时候几十秒就过，且本地/远端历史一致，最干净。
-    push 全失败才降级走 Git Data API，只把这次渲染出的源码文件送上去 —— 这样
-    「发布成功但源码没上去」不会再发生。降级意味着远端多一个 API 提交、本地多
-    一个还没推的提交，历史会分叉，所以打 WARN 提醒下次网络好时手动收拢。
-    两条都不通就返回 (None, "failed")，不影响站点已经发布这件事。
-    """
-    root = Path(cfg["paths"]["myBlog"])
-    branch = cfg["repos"]["myBlog"]["branch"]
-
-    for attempt in (1, 2, 3):
-        try:
-            res = _git(root, "push", "origin", branch, timeout=120)
-            if res.returncode == 0:
-                sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
-                log(f"myBlog 源码已 push -> {sha[:8]}")
-                return sha, "git"
-            log(f"myBlog push 第 {attempt} 次失败：{(res.stderr or res.stdout).strip()[:200]}", "WARN")
-        except subprocess.TimeoutExpired:
-            log(f"myBlog push 第 {attempt} 次超时（120s）", "WARN")
-        except Exception as exc:  # noqa: BLE001
-            log(f"myBlog push 第 {attempt} 次异常：{exc}", "WARN")
-
-    # 降级：远端工作区是干净的，用 Git Data API 把源码文件直接写上去
-    try:
-        dirty = _git(root, "status", "--porcelain", "--untracked-files=no", timeout=30).stdout.strip()
-        if dirty:
-            log("myBlog 工作区不干净，跳过 API 降级（怕把半个提交推上去）", "WARN")
-            return None, "failed"
-        diff = _git(root, "diff", "--name-only", "origin/" + branch, "HEAD", timeout=60).stdout.split()
-        if not diff:
-            sha = _git(root, "rev-parse", "HEAD", timeout=30).stdout.strip()
-            log("myBlog 远端已经是这个提交了", "WARN")
-            return sha, "already"
-        files = {p: (root / p).read_bytes() for p in diff if (root / p).exists()}
-        repo = cfg["repos"]["myBlog"]
-        res = gh.commit_files(repo["owner"], repo["name"], branch, files, message)
-        log(
-            f"myBlog 源码走 API 上去 -> {res['commit'][:8]}（{len(res['changed'])} 个文件）"
-        )
-        # API 提交和本地提交内容一致、只是历史不同。能 fetch 就把本地对齐过去，
-        # 否则下次 push 会 non-fast-forward 直接失败。
-        try:
-            if _git(root, "fetch", "origin", branch, timeout=120).returncode == 0:
-                _git(root, "reset", "--hard", f"origin/{branch}", timeout=60)
-                log(f"myBlog 本地已对齐到远端 {res['commit'][:8]}")
-                return res["commit"], "api"
-        except Exception as exc:  # noqa: BLE001
-            log(f"对齐本地失败（下次手跑 git fetch && git reset --hard origin/{branch}）：{exc}", "WARN")
-        return res["commit"], "api"
-    except Exception as exc:  # noqa: BLE001
-        log(f"myBlog 源码两条通道都没上去：{exc}", "ERROR")
-        return None, "failed"
 
 
 def hold_file() -> Path:
@@ -222,59 +177,69 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
         print(json.dumps(lint, ensure_ascii=False, indent=2))
         raise SystemExit("文风闸门未通过，不出稿")
 
-    # 2. 渲染两端
+    # 2. 渲染两端（写进两个仓库的工作区）
     info = render.write_outputs(src, d, cfg)
     log(f"渲染完成：{info['stem']}")
     log(f"  显示时间 {info['pub_datetime']}")
 
-    # 3. hexo 构建
+    hexo_rel = f"source/_posts/{info['stem']}.md"
+    astro_rel = f"src/content/blog/{info['stem']}.md"
+
+    # 3. 本地构建自检：0 字节页面、目标文章页没生成，都当场拦下
     public = run_hexo(cfg)
-    upload, deletions = collect_changes(public, cfg)
-    log(f"gh-pages 待推 {len(upload)} 个文件" + (f"，待删 {len(deletions)} 个" if deletions else ""))
+    expected = [p for p in public.rglob("index.html") if info["slug"] in str(p)]
+    if not expected:
+        raise SystemExit(f"构建完了却没找到这篇文章的页面（slug={info['slug']}），检查 frontmatter")
 
     if dry_run:
-        for p in sorted(upload)[:20]:
-            print("  +", p)
-        return {"dry_run": True, "would_upload": len(upload), **info}
+        log(f"dry-run：渲染了 {hexo_rel} 与 {astro_rel}，本地构建 OK（{len(expected)} 个页面）")
+        # dry-run 只做自检，不许在仓库里留改动：把刚写进去的两份文件还原
+        for root, rel in (
+            (Path(cfg["paths"]["myBlog"]), hexo_rel),
+            (Path(cfg["paths"]["astro"]), astro_rel),
+        ):
+            if (root / ".git").exists():
+                _git(root, "checkout", "--", rel, timeout=60)
+        return {"dry_run": True, "would_push": [hexo_rel, astro_rel], **info}
 
-    # 4. 推 gh-pages
-    repo = cfg["repos"]["gh_pages"]
     msg = cfg["publish"]["commit_message"].format(title=info["title"], date=d.isoformat())
-    res_gh = gh.commit_files(
-        repo["owner"], repo["name"], repo["branch"], upload, msg, deletions
-    )
-    log(f"gh-pages -> {res_gh['commit'][:8]}（{len(res_gh['changed'])} 个文件）")
 
-    # 5. 推 astro 正文
+    # 4. 源文进 myBlog 并推到 master —— 推上去之后 GitHub Actions 构建并部署
+    commit_local(cfg, [hexo_rel], msg)
+    src_sha, src_channel = push_with_fallback(
+        Path(cfg["paths"]["myBlog"]), cfg["repos"]["myBlog"], [hexo_rel], msg
+    )
+
+    # 5. astro 正文提交到 main —— 推上去之后 Vercel 自己构建部署
+    astro_root = Path(cfg["paths"]["astro"])
     astro_repo = cfg["repos"]["astro"]
-    astro_rel = f"src/content/blog/{info['stem']}.md"
-    res_astro = gh.commit_files(
-        astro_repo["owner"],
-        astro_repo["name"],
-        astro_repo["branch"],
-        {astro_rel: Path(info["astro_path"]).read_bytes()},
-        msg,
-    )
-    log(f"astro -> {res_astro['commit'][:8]}")
+    if (astro_root / ".git").exists():
+        # 先对齐本地，免得带着上次残留的脏文件去提交
+        try:
+            if _git(astro_root, "fetch", "origin", astro_repo["branch"], timeout=120).returncode == 0:
+                _git(astro_root, "reset", "--hard", f"origin/{astro_repo['branch']}", timeout=60)
+        except Exception as exc:  # noqa: BLE001
+            log(f"astro 本地对齐失败（走 API 也行）：{exc}", "WARN")
+        # reset 会冲掉第 2 步写进去的文件，这里重渲一次
+        render.write_outputs(src, d, cfg)
+        _git(astro_root, "add", "--", astro_rel, timeout=60)
+        _git(astro_root, "commit", "-m", msg, timeout=60)
+    astro_sha, astro_channel = push_with_fallback(astro_root, astro_repo, [astro_rel], msg)
+    log(f"astro -> {astro_sha[:8] if astro_sha else 'failed'}")
 
-    # 6. 源码提交到 myBlog 并推到远端（push 不通才降级 API）
-    hexo_rel = f"source/_posts/{info['stem']}.md"
-    src_sha = commit_local(cfg, [hexo_rel], msg)
-    src_sha, src_channel = push_source_to_myblog(cfg, msg)
-
-    # 7. 记账
+    # 6. 记账
     ledger = load_ledger()
     entry = {
         "date": d.isoformat(),
         "slug": info["slug"],
         "title": info["title"],
         "pub_datetime": info["pub_datetime"],
-        "status": "published",
-        "gh_pages_sha": res_gh["commit"],
-        "gh_pages_files": len(res_gh["changed"]),
-        "astro_sha": res_astro["commit"],
+        "status": "pushed",
         "myBlog_source_sha": src_sha,
         "myBlog_source_channel": src_channel,
+        "astro_sha": astro_sha,
+        "astro_channel": astro_channel,
+        "deploy": {"myBlog": "actions", "astro": "vercel"},
         "lint": {"chars": lint["stats"]["chars"], "warnings": lint["warnings"]},
     }
     ledger.setdefault("entries", [])
@@ -283,7 +248,7 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
     ledger["entries"].sort(key=lambda e: e["date"])
     save_ledger(ledger)
 
-    update_plan_status(d, "已发布")
+    update_plan_status(d, "已推送·等部署")
     return entry
 
 
