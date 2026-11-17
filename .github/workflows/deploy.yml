@@ -1,0 +1,52 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: |
+          npx hexo clean
+          npx hexo generate
+
+      - name: 检查有没有 0 字节页面
+        run: |
+          bad=$(find public -name index.html -size 0 | head -20)
+          if [ -n "$bad" ]; then
+            echo "构建出了 0 字节页面，不部署："
+            echo "$bad"
+            exit 1
+          fi
+          echo "页面数：$(find public -name '*.html' | wc -l)"
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "deploy: ${{ github.event.head_commit.message }}"
