@@ -39,7 +39,8 @@ cd /Users/zhaolanbaobao/Desktop/code/myBlog
 
 python3 autopilot/publish.py --check                       # 今天该不该发、发了没
 python3 autopilot/publish.py --date 2026-11-17 --dry-run   # 只过闸门和构建，不推
-python3 autopilot/publish.py --date 2026-11-17             # 真发
+python3 autopilot/publish.py --date 2026-11-17             # 真发（只推源码，构建在线上）
+python3 autopilot/publish.py --verify --date 2026-11-17    # 查线上 Actions / gh-pages / Vercel 成没成
 
 python3 autopilot/voice_lint.py autopilot/drafts/2026-11-17.md   # 单跑闸门，看 JSON
 python3 autopilot/weekly_plan.py --status                  # 本周七天进度

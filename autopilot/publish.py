@@ -4,6 +4,7 @@
     python3 publish.py --date 2026-11-17            # 正常发布
     python3 publish.py --date 2026-11-17 --dry-run  # 只跑闸门 + 本地构建自检，不推
     python3 publish.py --check                      # 只看今天该不该发、发了没
+    python3 publish.py --verify --date 2026-11-17    # 查线上 Actions / gh-pages / Vercel 成没成
 
 两条部署路径都不在本地做：
 - myBlog master push 后由 .github/workflows/deploy.yml 构建并推 zhaoqianguo.github.io 的 gh-pages；
@@ -164,7 +165,11 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
 
     # 已经发过就别再发一遍：重跑会改显示时间、重推一遍文件，旧链接的时间戳也会变
     done = next(
-        (e for e in load_ledger().get("entries", []) if e.get("date") == d.isoformat() and e.get("status") == "published"),
+        (
+            e
+            for e in load_ledger().get("entries", [])
+            if e.get("date") == d.isoformat() and e.get("status") in ("pushed", "published")
+        ),
         None,
     )
     if done and not force:
@@ -213,6 +218,8 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
     # 5. astro 正文提交到 main —— 推上去之后 Vercel 自己构建部署
     astro_root = Path(cfg["paths"]["astro"])
     astro_repo = cfg["repos"]["astro"]
+    astro_bytes = Path(info["astro_path"]).read_bytes()  # 先存下来，reset 会冲掉工作区
+    committed = False
     if (astro_root / ".git").exists():
         # 先对齐本地，免得带着上次残留的脏文件去提交
         try:
@@ -220,11 +227,30 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
                 _git(astro_root, "reset", "--hard", f"origin/{astro_repo['branch']}", timeout=60)
         except Exception as exc:  # noqa: BLE001
             log(f"astro 本地对齐失败（走 API 也行）：{exc}", "WARN")
-        # reset 会冲掉第 2 步写进去的文件，这里重渲一次
-        render.write_outputs(src, d, cfg)
+        # 把同一份字节写回去。不能重渲 —— 重渲会拿到新的 pub_datetime，两边就对不上了
+        target = astro_root / astro_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(astro_bytes)
         _git(astro_root, "add", "--", astro_rel, timeout=60)
-        _git(astro_root, "commit", "-m", msg, timeout=60)
-    astro_sha, astro_channel = push_with_fallback(astro_root, astro_repo, [astro_rel], msg)
+        res = _git(astro_root, "commit", "-m", msg, timeout=60)
+        committed = res.returncode == 0
+        if not committed:
+            log(f"astro 本地没提交（{res.stdout.strip() or res.stderr.strip()}），改走 API", "WARN")
+
+    if committed:
+        astro_sha, astro_channel = push_with_fallback(astro_root, astro_repo, [astro_rel], msg)
+    else:
+        # 本地这条走不通就直接 API 写远端，别让 push 白跑一趟报个假的 sha
+        try:
+            res = gh.commit_files(
+                astro_repo["owner"], astro_repo["name"], astro_repo["branch"],
+                {astro_rel: astro_bytes}, msg,
+            )
+            astro_sha, astro_channel = res["commit"], "api"
+            log(f"astro 走 API 上去 -> {astro_sha[:8]}")
+        except Exception as exc:  # noqa: BLE001
+            log(f"astro 两条通道都没上去：{exc}", "ERROR")
+            astro_sha, astro_channel = None, "failed"
     log(f"astro -> {astro_sha[:8] if astro_sha else 'failed'}")
 
     # 6. 记账
@@ -268,11 +294,54 @@ def check(cfg: dict) -> dict:
     }
 
 
+def verify(cfg: dict, d: Date) -> dict:
+    """查这一天推上去之后，线上到底构建成没成。只读，不改任何东西。"""
+    entry = next((e for e in load_ledger().get("entries", []) if e.get("date") == d.isoformat()), None)
+    out: dict = {"date": d.isoformat(), "ledger": entry}
+
+    # myBlog：Actions 那次 run 成没成
+    try:
+        runs = gh.api("GET", f"{gh.repo_path('zhaoqianguo', 'myBlog')}/actions/runs?per_page=5")["workflow_runs"]
+        mine = [r for r in runs if entry and r["head_sha"].startswith((entry.get("myBlog_source_sha") or "\0")[:8])]
+        run = mine[0] if mine else runs[0]
+        out["actions"] = {
+            "id": run["id"], "status": run["status"], "conclusion": run["conclusion"],
+            "head_sha": run["head_sha"][:8], "url": run["html_url"],
+        }
+    except Exception as exc:  # noqa: BLE001
+        out["actions"] = {"error": str(exc)}
+
+    # gh-pages：产物仓库的 head
+    try:
+        repo = cfg["repos"]["gh_pages"]
+        ref = gh.api("GET", f"{gh.repo_path(repo['owner'], repo['name'])}/git/ref/heads/{repo['branch']}")
+        c = gh.api("GET", f"{gh.repo_path(repo['owner'], repo['name'])}/commits/{ref['object']['sha']}")
+        out["gh_pages"] = {"sha": c["sha"][:8], "date": c["commit"]["author"]["date"],
+                           "message": c["commit"]["message"].splitlines()[0][:60]}
+    except Exception as exc:  # noqa: BLE001
+        out["gh_pages"] = {"error": str(exc)}
+
+    # astro：commit status 里的 Vercel context
+    try:
+        st = gh.api("GET", f"{gh.repo_path('zhaoqianguo', 'astro-blog')}/commits/main/status")
+        out["vercel"] = {s["context"]: s["state"] for s in st.get("statuses", [])}
+    except Exception as exc:  # noqa: BLE001
+        out["vercel"] = {"error": str(exc)}
+
+    out["ok"] = (
+        out.get("actions", {}).get("conclusion") == "success"
+        and out.get("vercel", {}).get("Vercel") in ("success", "pending")
+        and "error" not in out.get("gh_pages", {})
+    )
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--verify", action="store_true", help="查这一天的线上部署成没成")
     ap.add_argument("--force", action="store_true", help="当天已发过也重发一遍")
     args = ap.parse_args()
 
@@ -283,6 +352,12 @@ def main() -> int:
         return 0
 
     d = Date.fromisoformat(args.date) if args.date else today(cfg)
+
+    if args.verify:
+        out = verify(cfg, d)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out["ok"] else 1
+
     entry = publish(d, cfg, args.dry_run, args.force)
     print(json.dumps(entry, ensure_ascii=False, indent=2))
     return 0
