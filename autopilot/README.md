@@ -12,23 +12,36 @@
   ↓ render.py              （同一份正文，渲两套 frontmatter）
   ├→ myBlog/source/_posts/2026-11-17-xxx.md
   └→ astro-blog/src/content/blog/2026-11-17-xxx.md
-  ↓ hexo clean && generate （本地构建只为自检：0 字节页、文章页没生成，当场拦下）
+  ↓ hexo clean && generate （本地构建：自检用，--direct 时也就是要推的那份）
   ↓ 源码进 myBlog，推 origin master
   │    → GitHub Actions 跑 .github/workflows/deploy.yml
   │    → npm ci → hexo generate → 推 zhaoqianguo/zhaoqianguo.github.io 的 gh-pages
   │    → https://zhaoqianguo.github.io/
+  │  或者加 --direct：上面那份 public/ 当场直接推 gh-pages，不等 Actions
   ├→ astro 正文推到 astro-blog main
   │    → Vercel 自动构建
   │    → https://daxigua-crown.vercel.app/
   ↓ 写 ledger.json，回写 plan/{周}.md 的状态列
 ```
 
-**部署全在线上，本地不产出 gh-pages 了。** 本地只做两件事：过闸门 + 把提交送出去。
-好处是本机网络再抽风，只要提交能上去，构建和部署都不受影响；坏处是本地 `public/`
-和线上不再是同一份构建（Node 版本、时区可能有细微差别），所以 `public/` 现在只是自检产物。
+**部署默认在线上做。** 本地只做两件事：过闸门 + 把提交送出去。
+好处是本机网络再抽风，只要提交能上去，构建和部署都不受影响。
 
-耗时：hexo 本地自检 4 秒，push 几秒到几十秒，Actions 构建约 40 秒，Vercel 约 30 秒。
-**本机上的操作 1 分钟内结束**，线上构建自己跑，不用等。
+**但本地那份构建不是白做的。** 它本来就要跑一次自检，产物和 Actions 那份逐字节一致
+（`scripts/deterministic_*.js` 六个脚本就是干这个的），所以想立刻上线时加 `--direct`，
+直接把 `public/` 推成 gh-pages 就行，不用等 Actions 排队。两条通道并存，互不排斥：
+
+| 情况 | 命令 | gh-pages 由谁推 |
+|---|---|---|
+| 审完就想立刻看到线上 | `--direct` | 本地，几十秒 |
+| 审完不着急，或本机要关机 | 不加参数 | Actions，约 40 秒 |
+| `--direct` 推失败 | 自动回退 | Actions 还在跑，会补上 |
+
+同一个 commit 之后 Actions 仍会跑一遍；它推的 tree 与已推的一致，会被 peaceiris 判成
+没变化而跳过，不会来回覆盖。`ledger.json` 里 `deploy.myBlog` 记着这次是 `direct` 还是 `actions`。
+
+耗时：hexo 本地自检 4 秒，`--direct` 直推约 20~60 秒；不加参数则 push 几秒到几十秒，
+Actions 构建约 40 秒，Vercel 约 30 秒。
 
 ---
 
@@ -40,6 +53,7 @@ cd /Users/zhaolanbaobao/Desktop/code/myBlog
 python3 autopilot/publish.py --check                       # 今天该不该发、发了没
 python3 autopilot/publish.py --date 2026-11-17 --dry-run   # 只过闸门和构建，不推
 python3 autopilot/publish.py --date 2026-11-17             # 真发（只推源码，构建在线上）
+python3 autopilot/publish.py --date 2026-11-17 --direct    # 真发 + 本地直接推 gh-pages，不等 Actions
 python3 autopilot/publish.py --verify --date 2026-11-17    # 查线上 Actions / gh-pages / Vercel 成没成
 
 python3 autopilot/voice_lint.py autopilot/drafts/2026-11-17.md   # 单跑闸门，看 JSON

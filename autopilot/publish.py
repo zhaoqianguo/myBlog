@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """发布一篇：草稿 → 文风闸门 → 渲染两端 → 推 myBlog(master) 与 astro(main)，部署交给线上。
 
-    python3 publish.py --date 2026-11-17            # 正常发布
+    python3 publish.py --date 2026-11-17            # 正常发布：推源码，部署交给线上
+    python3 publish.py --date 2026-11-17 --direct   # 本地这份 public/ 也直接推 gh-pages，不等 Actions
     python3 publish.py --date 2026-11-17 --dry-run  # 只跑闸门 + 本地构建自检，不推
     python3 publish.py --check                      # 只看今天该不该发、发了没
     python3 publish.py --verify --date 2026-11-17    # 查线上 Actions / gh-pages / Vercel 成没成
 
-两条部署路径都不在本地做：
-- myBlog master push 后由 .github/workflows/deploy.yml 构建并推 zhaoqianguo.github.io 的 gh-pages；
-- astro-blog main push 后由 Vercel 自动构建部署。
+部署有两条通道，平时只用第一条：
 
-本地只做两件事：把源码提交推上去、用 hexo 本地构建一次做自检（0 字节页面直接拦下）。
-这样做的好处是发布不再依赖本机网络稳定 —— 本机只要能把提交送出去就行。
+1. 默认（线上）：myBlog master push 后由 .github/workflows/deploy.yml 构建并推 gh-pages；
+   astro-blog main push 后由 Vercel 自动构建部署。
+2. `--direct`（本地直通）：本地 hexo 已经构建过一次了，顺手把这份 public/ 直接推成 gh-pages，
+   不必等 Actions 排队。本地构建与 Actions 构建产物应该一致（六个 scripts/deterministic_*.js
+   就是为此存在），所以两条通道推上去的内容是一样的。同一个 commit 之后 Actions 还会再跑一次，
+   推上去的 tree 相同就会被它判成没变化，不会来回覆盖。
+
+两条都只依赖 HTTPS API，本机能不能 push 不影响出稿。
 """
 from __future__ import annotations
 
@@ -155,7 +160,59 @@ def hold_file() -> Path:
     return ROOT / "HOLD"
 
 
-def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
+def _local_blob_sha(root: Path, rel: str) -> str:
+    """本地文件的 git blob sha，跟远端 tree 里的 sha 是同一套算法，可以直接比。"""
+    res = subprocess.run(
+        ["git", "hash-object", "--", rel],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"hash-object 失败：{res.stderr.strip()}")
+    return res.stdout.strip()
+
+
+def push_site_direct(cfg: dict, public: Path, message: str) -> dict:
+    """把本地 public/ 直接推成 gh-pages。不等 Actions，自己就是那条通道。
+
+    只推 blob sha 变了的文件，避免每次几十个 HTML 全量重写。
+    """
+    repo = cfg["repos"]["gh_pages"]
+    owner, name, branch = repo["owner"], repo["name"], repo["branch"]
+    root = Path(cfg["paths"]["myBlog"])
+
+    head = gh.head_commit(owner, name, branch)
+    tree = gh.api("GET", f"{gh.repo_path(owner, name)}/git/trees/{head['tree']['sha']}?recursive=1")
+    remote = {e["path"]: e["sha"] for e in tree.get("tree", []) if e["type"] == "blob"}
+
+    local: dict[str, bytes] = {}
+    changed: dict[str, bytes] = {}
+    for p in sorted(public.rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(public).as_posix()
+        data = p.read_bytes()
+        local[rel] = data
+        if remote.get(rel) != _local_blob_sha(root, p.relative_to(root).as_posix()):
+            changed[rel] = data
+
+    deletions: list[str] = []
+    if not cfg["publish"].get("skip_deletions", True):
+        # .nojekyll 是 Actions 加上去的，本地构建不产出，别顺手删了
+        deletions = [p for p in remote if p not in local and p != ".nojekyll"]
+
+    if not changed and not deletions:
+        log("gh-pages 远端已经是这一份，不用推")
+        return {"sha": head["sha"], "files": 0, "channel": "already"}
+
+    res = gh.commit_files(owner, name, branch, changed, message, deletions=deletions)
+    log(
+        f"直接推 gh-pages -> {res['commit'][:8]}"
+        f"（{len(res.get('changed', []))} 个文件，删 {len(deletions)} 个）"
+    )
+    return {"sha": res["commit"], "files": len(res.get("changed", [])), "channel": "api"}
+
+
+def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False, direct: bool = False) -> dict:
     if hold_file().exists() and not dry_run:
         raise SystemExit(f"{hold_file()} 还在，停发。删掉它再跑。")
 
@@ -254,6 +311,14 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
     log(f"astro -> {astro_sha[:8] if astro_sha else 'failed'}")
 
     # 6. 记账
+    # --direct：本地这份 public/ 直接推成 gh-pages，不等 Actions 排队
+    site = None
+    if direct:
+        try:
+            site = push_site_direct(cfg, public, msg)
+        except Exception as exc:  # noqa: BLE001
+            log(f"直接推 gh-pages 失败（Actions 那条路还在，等它跑完也行）：{exc}", "ERROR")
+
     ledger = load_ledger()
     entry = {
         "date": d.isoformat(),
@@ -265,16 +330,19 @@ def publish(d: Date, cfg: dict, dry_run: bool, force: bool = False) -> dict:
         "myBlog_source_channel": src_channel,
         "astro_sha": astro_sha,
         "astro_channel": astro_channel,
-        "deploy": {"myBlog": "actions", "astro": "vercel"},
+        "deploy": {"myBlog": "direct" if site else "actions", "astro": "vercel"},
         "lint": {"chars": lint["stats"]["chars"], "warnings": lint["warnings"]},
     }
+    if site:
+        entry["gh_pages_sha"] = site["sha"]
+        entry["gh_pages_files"] = site["files"]
     ledger.setdefault("entries", [])
     ledger["entries"] = [e for e in ledger["entries"] if e.get("date") != d.isoformat()]
     ledger["entries"].append(entry)
     ledger["entries"].sort(key=lambda e: e["date"])
     save_ledger(ledger)
 
-    update_plan_status(d, "已推送·等部署")
+    update_plan_status(d, "已推送·等部署" if not site else "已发布")
     return entry
 
 
@@ -328,10 +396,30 @@ def verify(cfg: dict, d: Date) -> dict:
     except Exception as exc:  # noqa: BLE001
         out["vercel"] = {"error": str(exc)}
 
+    # 走 --direct 的那次，gh-pages 是本地直接推的，Actions 可能还在跑或者根本不用等
+    direct = (entry or {}).get("deploy", {}).get("myBlog") == "direct"
+    want = (entry or {}).get("gh_pages_sha") or ""
+    title = (entry or {}).get("title") or ""
+    got = out.get("gh_pages", {})
+    gh_ok = "error" not in got
+    if direct:
+        # 直推之后 Actions 还会再跑一遍，它推的 message 是 deploy: post: ...；
+        # 内容一样但 sha 会变，所以两种情况都算成
+        gh_ok = (
+            got.get("sha", "") == want[:8]
+            or (title and title[:12] in got.get("message", ""))
+        )
+
+    actions_ok = out.get("actions", {}).get("conclusion") == "success"
+    if direct:
+        # 直接推过就不拿 Actions 当判据了，它顶多再跑一遍同样内容
+        actions_ok = out.get("actions", {}).get("conclusion") in ("success", "failure", None)
+
+    out["mode"] = "direct" if direct else "actions"
     out["ok"] = (
-        out.get("actions", {}).get("conclusion") == "success"
+        actions_ok
         and out.get("vercel", {}).get("Vercel") in ("success", "pending")
-        and "error" not in out.get("gh_pages", {})
+        and gh_ok
     )
     return out
 
@@ -342,6 +430,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--verify", action="store_true", help="查这一天的线上部署成没成")
+    ap.add_argument(
+        "--direct",
+        action="store_true",
+        help="本地这份 public/ 直接推成 gh-pages，不等 GitHub Actions",
+    )
     ap.add_argument("--force", action="store_true", help="当天已发过也重发一遍")
     args = ap.parse_args()
 
@@ -358,7 +451,7 @@ def main() -> int:
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0 if out["ok"] else 1
 
-    entry = publish(d, cfg, args.dry_run, args.force)
+    entry = publish(d, cfg, args.dry_run, args.force, args.direct)
     print(json.dumps(entry, ensure_ascii=False, indent=2))
     return 0
 
