@@ -31,6 +31,28 @@
         "chars": 1575,
         "warnings": []
       }
+    },
+    {
+      "date": "2026-11-18",
+      "slug": "ref为什么要包一层value",
+      "title": "ref 为什么要包一层 .value",
+      "pub_datetime": "2026-11-19T09:34:00+08:00",
+      "status": "pushed",
+      "myBlog_source_sha": "66780245",
+      "myBlog_source_channel": "git",
+      "astro_sha": "303fbd1b7db7f56be62bba027a8e5fcdbcc1c673",
+      "astro_channel": "git",
+      "deploy": {
+        "myBlog": "direct",
+        "astro": "vercel"
+      },
+      "lint": {
+        "chars": 2243,
+        "warnings": []
+      },
+      "gh_pages_sha": "d37a63a0211fe653eae8dab636e45ff544c428a0",
+      "gh_pages_files": 51,
+      "note": "预检时 github 直连超时 3 次（Actions 未触发），改用代理后手动 git push 补齐源码"
     }
   ],
   "series": []
